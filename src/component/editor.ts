@@ -23,8 +23,15 @@ export class Editor extends HTMLElement {
     this.editor = editor;
 
     editor.getWrapperElement().style.fontSize = '12px';
-    editor.on('change', () => dispatch('updateContent', this.value));
-    watch(this.fileContents, (v) => (this.value = v));
+    editor.on('change', () => {
+      dispatch('updateContent', this.value)
+      dispatch('autosave');
+    });
+
+    watch(this.fileContents, (v) => {
+      this.value = v;
+      editor.refresh();
+    });
 
     this.editor.refresh();
     this.handler = window.addEventListener('resize', () => this.editor.refresh());

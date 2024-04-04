@@ -245,7 +245,14 @@ const actions = {
     set('storeId', storeId);
     commit();
   },
+
+  autosave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => dispatch('save'), 200);
+  },
 };
+
+let saveTimer;
 
 const { set, get, react, watch, select, dispatch, commit } = useState(initialState, actions);
 
