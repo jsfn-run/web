@@ -248,7 +248,7 @@ const actions = {
 
   autosave() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => dispatch('save'), 200);
+    saveTimer = setTimeout(() => dispatch('save'), 1000);
   },
 };
 
