@@ -34,10 +34,15 @@ export function isRef(v): v is Ref<any> {
   return v && v instanceof Ref;
 }
 
-export function useState<T extends object, A extends string>(initialState: T, actions: Record<A, Function>) {
-  const stateChangeEvent = '@@statechange';
+export function useState<
+  T extends object,
+  A extends string,
+  F extends (...args: any) => any
+>(initialState: T, actions: Record<A, F>) {
+  const stateChangeEvent = "@@statechange";
   const events = new EventTarget();
-  const onStateChange = (detail: any) => events.dispatchEvent(new CustomEvent(stateChangeEvent, { detail }));
+  const onStateChange = (detail: any) =>
+    events.dispatchEvent(new CustomEvent(stateChangeEvent, { detail }));
 
   let devTools;
 
@@ -66,7 +71,10 @@ export function useState<T extends object, A extends string>(initialState: T, ac
     return state[key];
   }
 
-  function watch<V extends any>(input: Ref<V>, observer: (v: V, p: V | undefined) => void) {
+  function watch<V extends any>(
+    input: Ref<V>,
+    observer: (v: V, p: V | undefined) => void
+  ) {
     let lastValue: V;
     lastValue = input.value!;
     observer(lastValue, undefined);
@@ -86,13 +94,14 @@ export function useState<T extends object, A extends string>(initialState: T, ac
   }
 
   async function dispatch(action: A, payload: any = null) {
-    await actions[action](payload);
+    const result = await actions[action](payload);
     devTools?.send(action, state);
     onStateChange(state);
+    return result as ReturnType<(typeof actions)[A]>;
   }
 
   async function commit() {
-    devTools?.send('@@commit', state);
+    devTools?.send("@@commit", state);
     onStateChange(state);
   }
 

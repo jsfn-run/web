@@ -42,6 +42,15 @@ const initialState = {
   profileId: '',
 };
 
+async function fetchFile(binId, fileId) {
+  const meta = await readMetadata(binId, fileId);
+  const file = { meta, contents: "" };
+  const contents = await readFile(binId, fileId);
+  file.contents = await contents.text();
+
+  return file;
+}
+
 const actions = {
   async create() {
     const name = prompt('New function name');
@@ -52,13 +61,31 @@ const actions = {
     const { binId } = await createBin();
     const fn = { id, binId, name };
 
-    await getResourceStore().getResource('fn').set(id, fn);
+    await getResourceStore().getResource("fn").set(id, fn);
 
-    await dispatch('selectFunction', fn);
-    await dispatch('addFile', 'index.mjs');
+    await dispatch("selectFunction", fn);
+    const index = await dispatch("addFile", "index.mjs");
+    const manifest = await dispatch("addFile", "package.json");
 
-    const files = get('fileList');
-    await dispatch('selectFile', files[0] || null);
+    index!.contents = `
+export default {
+  actions: {
+    fn: {
+      default: true,
+      async handler(input, output) {
+        // TODO
+      }
+    }
+  }
+}`;
+
+    manifest!.contents = JSON.stringify({ name, dependencies: {} }, null);
+
+    await dispatch("saveFile", index);
+    await dispatch("saveFile", manifest);
+
+    const files = get("fileList");
+    await dispatch("selectFile", files[0] || null);
   },
 
   async editname() {
@@ -74,6 +101,12 @@ const actions = {
     await getResourceStore().getResource('fn').set(fn.id, newValue);
     set('currentFunction', newValue);
     await dispatch('updateFunctionList');
+  },
+
+  async saveFile(file) {
+    if (file.meta?.id) {
+      await writeFile(get('binId'), file.meta.id, file.contents);
+    }
   },
 
   async addFile(name: string) {
@@ -93,6 +126,8 @@ const actions = {
     const { fileId } = await createFile(binId);
     await writeMetadata(binId, fileId, { name });
     await dispatch('updateFileList');
+
+    return { meta: { id: fileId, name }, contents: '' };
   },
 
   async updateFileList() {
@@ -104,11 +139,8 @@ const actions = {
     const fileIds = await listFiles(binId);
 
     for (const fileId of fileIds) {
-      const meta = await readMetadata(binId, fileId);
-      const file = { meta, contents: '' };
+      const file = await fetchFile(binId, fileId);
       list.push(file);
-      const contents = await readFile(binId, fileId);
-      file.contents = await contents.text();
     }
 
     set('fileList', list);
@@ -127,13 +159,10 @@ const actions = {
 
   async save() {
     const currentFile = get('currentFile');
-
-    if (currentFile?.meta?.id) {
-      await writeFile(get('binId'), currentFile.meta.id, currentFile.contents);
-    }
+    await dispatch('saveFile', currentFile);
   },
 
-  updateContent(value) {
+  updateCurrentFileContent(value) {
     const currentFile = get('currentFile');
     set('currentFile', {
       meta: currentFile?.meta,
@@ -204,9 +233,7 @@ const actions = {
     try {
       await isAuthenticated();
       dispatch('reloadAll');
-    } catch {
-
-    }
+    } catch {}
   },
   async resetAll() {
     set('currentFile', null);

@@ -24,7 +24,7 @@ export class Editor extends HTMLElement {
 
     editor.getWrapperElement().style.fontSize = '12px';
     editor.on('change', () => {
-      dispatch('updateContent', this.value);
+      dispatch('updateCurrentFileContent', this.value);
       dispatch('autosave');
     });
 
