@@ -7,6 +7,7 @@ import {
   writeFile,
   createFile,
   createBin,
+  removeBin,
   getZipUrl,
 } from 'https://bin.homebots.io/index.mjs';
 import {
@@ -162,6 +163,15 @@ export default {
     await dispatch('saveFile', currentFile);
   },
 
+  async deleteFn() {
+    const fn = get('currentFunction');
+
+    if (fn && confirm(`Are you sure you want to remove "${fn.name}"? NO WAY BACK!`)) {
+      await getResourceStore().getResource('fn').remove(fn.id);
+      await removeBin(fn.binId);
+    }
+  },
+
   updateCurrentFileContent(value) {
     const currentFile = get('currentFile');
     set('currentFile', {
@@ -172,7 +182,8 @@ export default {
   },
 
   async updateFunctionList() {
-    set('functionList', await getResourceStore().getResource('fn').list());
+    const list: FunctionEntry[] = await getResourceStore().getResource('fn').list();
+    set('functionList', list.sort((a, b) => (a.name > b.name ? 1 : -1)));
     commit();
   },
 

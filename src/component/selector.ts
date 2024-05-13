@@ -41,9 +41,7 @@ export class Selector extends HTMLElement {
 
   updateOptions() {
     const selector = this.querySelector('select')!;
-    const mappedOptions = this.options.value!
-      .map((f) => ({ label: f.name, value: f }))
-      .sort((a, b) => (a.label > b.label ? 1 : -1));
+    const mappedOptions = this.options.value!.map((f) => ({ label: f.name, value: f }));
 
     const options = [
       { label: `${this.getAttribute('placeholder') || 'Select an option'}`, value: { id: '' } },
