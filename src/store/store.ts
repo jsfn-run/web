@@ -169,6 +169,7 @@ export default {
     if (fn && confirm(`Are you sure you want to remove "${fn.name}"? NO WAY BACK!`)) {
       await getResourceStore().getResource('fn').remove(fn.id);
       await removeBin(fn.binId);
+      await dispatch('unselectFunction');
     }
   },
 
@@ -203,6 +204,13 @@ export default {
   selectFile(file) {
     set('currentFile', file);
     commit();
+  },
+
+  unselectFunction() {
+    set('binId', '');
+    set('currentFile', null);
+    set('currentFunction', null);
+    set('fileList', []);
   },
 
   async selectFunction(fn: FunctionEntry) {
