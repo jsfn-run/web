@@ -9,6 +9,9 @@ const t = html`
     <button class="w-6 h-6" ^click="editname" .hidden="noFunctionSelected">
       <span class="material-icons">edit</span>
     </button>
+    <button class="w-6 h-6" ^click="deleteFn" .hidden="noFunctionSelected">
+      <span class="material-icons">delete</span>
+    </button>
   </div>
 `;
 
@@ -38,7 +41,10 @@ export class Selector extends HTMLElement {
 
   updateOptions() {
     const selector = this.querySelector('select')!;
-    const mappedOptions = this.options.value!.map((f) => ({ label: f.name, value: f }));
+    const mappedOptions = this.options.value!
+      .map((f) => ({ label: f.name, value: f }))
+      .sort((a, b) => (a.label > b.label ? 1 : -1));
+
     const options = [
       { label: `${this.getAttribute('placeholder') || 'Select an option'}`, value: { id: '' } },
       ...mappedOptions,
