@@ -248,6 +248,16 @@ export default {
   async startup() {
     authEvents.addEventListener('signout', () => dispatch('resetAll'));
     authEvents.addEventListener('signin', async () => dispatch('reloadAll'));
+    authEvents.addEventListener('state', async (profile) => {
+      const id = profile?.id || '';
+      set('profileId', id);
+      commit();
+      if (id) {
+        dispatch('reloadAll');
+      } else {
+        dispatch('resetAll');
+      }
+    });
 
     try {
       await isAuthenticated();
