@@ -1,44 +1,24 @@
-import CodeMirror from '../vendor/codemirror.js';
-import { customElement } from './decorators.js';
-import { dispatch, select, watch } from '../store/store.js';
+import { customElement } from "./decorators.js";
+import { dispatch, select, watch } from "../store/store.js";
+import '@sodium/code-editor';
 
-@customElement('js-editor')
+@customElement("js-editor")
 export class Editor extends HTMLElement {
-  private editor: any = null;
-  private handler: any = null;
-  private fileContents = select((s) => s.currentFile?.contents || '');
-
-  get value() {
-    return this.editor?.getValue();
-  }
-
-  set value(v) {
-    if (this.value !== v) {
-      this.editor?.setValue(v);
-    }
-  }
+  private fileContents = select((s) => s.currentFile?.contents || "");
 
   connectedCallback() {
-    const editor: any = new CodeMirror(this, { lineNumbers: true });
-    this.editor = editor;
+    const editor = document.createElement("code-editor") as any;
+    this.append(editor);
 
-    editor.getWrapperElement().style.fontSize = '12px';
-    editor.on('change', () => {
-      dispatch('updateCurrentFileContent', this.value);
-      dispatch('autosave');
+    editor.addEventListener("change", () => {
+      dispatch("updateCurrentFileContent", editor.value);
+      dispatch("autosave");
     });
 
     watch(this.fileContents, (v) => {
-      this.value = v;
-      editor.refresh();
+      if (editor.value !== v) {
+        editor.value = v;
+      }
     });
-
-    this.editor.refresh();
-    this.handler = window.addEventListener('resize', () => this.editor.refresh());
-  }
-
-  disconnectedCallback() {
-    this.handler();
-    this.handler = null;
   }
 }
