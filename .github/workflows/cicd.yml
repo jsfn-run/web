@@ -12,7 +12,6 @@ jobs:
       contents: read
       packages: write
     with:
-      name: node-lambdas/web
       baseImage: cloud-cli/node:latest
       withSha: false
       withTag: true
