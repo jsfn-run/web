@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [],
   build: {
     rollupOptions: {
-      external: [/@(lithium|sodium|lucide)\/.*/],
+      external: [/@(li3|sodium|lucide)\/.*/],
     },
   },
 });
