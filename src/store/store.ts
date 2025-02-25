@@ -1,4 +1,5 @@
-import { Store } from 'https://store.homebots.io/index.mjs';
+import { Store } from "https://store.homebots.io/index.mjs";
+import { createStore } from "@li3/store";
 import {
   listFiles,
   writeMetadata,
@@ -9,7 +10,7 @@ import {
   createBin,
   removeBin,
   getZipUrl,
-} from 'https://bin.homebots.io/index.mjs';
+} from "https://bin.homebots.io/index.mjs";
 import {
   getProfile,
   getProperty,
@@ -18,9 +19,13 @@ import {
   signOut,
   isAuthenticated,
   events as authEvents,
-} from 'https://auth.jsfn.run/index.mjs';
+} from "https://auth.jsfn.run/index.mjs";
 
-import { useState } from '../vendor/state.js';
+let saveTimer;
+
+function getResourceStore() {
+  return Store.get(get((s) => s.storeId));
+}
 
 export type FileEntry = {
   contents: string;
@@ -33,42 +38,7 @@ export type FunctionEntry = {
   name: string;
 };
 
-const initialState = {
-  fileList: [] as FileEntry[],
-  functionList: [] as FunctionEntry[],
-  currentFunction: {} as FunctionEntry | null,
-  currentFile: null as FileEntry | null,
-  binId: '',
-  storeId: '',
-  profileId: '',
-};
-
-async function fetchFile(binId, fileId) {
-  const meta = await readMetadata(binId, fileId);
-  const file = { meta, contents: "" };
-  const contents = await readFile(binId, fileId);
-  file.contents = await contents.text();
-
-  return file;
-}
-
-const actions = {
-  async create() {
-    const name = prompt('New function name');
-
-    if (!name) return;
-
-    const id = crypto.randomUUID();
-    const { binId } = await createBin();
-    const fn = { id, binId, name };
-
-    await getResourceStore().getResource("fn").set(id, fn);
-
-    await dispatch("selectFunction", fn);
-    const index = await dispatch("addFile", "index.mjs");
-    const manifest = await dispatch("addFile", "package.json");
-
-    index!.contents = `
+const initialFunctionContent = `
 export default {
   actions: {
     fn: {
@@ -80,44 +50,86 @@ export default {
   }
 }`;
 
+const initialState = {
+  fileList: [] as FileEntry[],
+  functionList: [] as FunctionEntry[],
+  currentFunction: {} as FunctionEntry | null,
+  currentFile: null as FileEntry | null,
+  newFile: null as FileEntry | null,
+  binId: "",
+  storeId: "",
+  profileId: "",
+};
+
+async function fetchFile(binId, fileId) {
+  const meta = await readMetadata(binId, fileId);
+  const file = { meta, contents: "" };
+  const contents = await readFile(binId, fileId);
+  file.contents = await contents.text();
+
+  return file;
+}
+
+const { store, get, select } = createStore(initialState, {
+  async create() {
+    const name = prompt("New function name");
+
+    if (!name) return;
+
+    const id = crypto.randomUUID();
+    const { binId } = await createBin();
+    const fn = { id, binId, name };
+
+    await getResourceStore().getResource("fn").set(id, fn);
+
+    await store.selectFunction(fn);
+    const index = await store.addFile("index.mjs");
+    const manifest = await store.addFile("package.json");
+
+    index!.contents = initialFunctionContent;
+
     manifest!.contents = JSON.stringify({ name, dependencies: {} }, null);
 
-    await dispatch("saveFile", index);
-    await dispatch("saveFile", manifest);
+    await store.saveFile(index);
+    await store.saveFile(manifest);
 
-    const files = get("fileList");
-    await dispatch("selectFile", files[0] || null);
+    const files = get((s) => s.fileList);
+    await store.selectFile(files[0] || null);
   },
 
-  async editname() {
-    const fn = get('currentFunction');
+  async editname(state) {
+    const fn = get((s) => s.currentFunction);
 
     if (!fn) return;
 
-    const name = prompt('Name', fn.name) || '';
+    const name = prompt("Name", fn.name) || "";
 
     if (!name) return;
 
     const newValue = { ...fn, name };
-    await getResourceStore().getResource('fn').set(fn.id, newValue);
-    set('currentFunction', newValue);
-    await dispatch('updateFunctionList');
+    await getResourceStore().getResource("fn").set(fn.id, newValue);
+    state.currentFunction = newValue;
+    await store.updateFunctionList();
   },
 
   async saveFile(file) {
     if (file.meta?.id) {
-      await writeFile(get('binId'), file.meta.id, file.contents);
+      await writeFile(
+        get((s) => s.binId),
+        file.meta.id,
+        file.contents
+      );
     }
   },
 
-  async addFile(name: string) {
-    const binId = get('binId');
+  async addFile(state, name: string) {
+    const binId = get((s) => s.binId);
     if (!binId) {
       return;
     }
 
     if (!name) {
-      name = prompt('Name for the new file', '') || '';
+      name = prompt("Name for the new file", "") || "";
     }
 
     if (!name) {
@@ -126,14 +138,14 @@ export default {
 
     const { fileId } = await createFile(binId);
     await writeMetadata(binId, fileId, { name });
-    await dispatch('updateFileList');
+    await store.updateFileList();
 
-    return { meta: { id: fileId, name }, contents: '' };
+    state.newFile = { meta: { id: fileId, name }, contents: "" };
   },
 
-  async updateFileList() {
+  async updateFileList(state) {
     const list: FileEntry[] = [];
-    const binId = get('binId');
+    const binId = get((s) => s.binId);
 
     if (!binId) return;
 
@@ -144,48 +156,50 @@ export default {
       list.push(file);
     }
 
-    set('fileList', list);
-    commit();
+    state.fileList = list;
   },
 
-  async updateProfileId() {
+  async updateProfileId(state) {
     try {
       const p = await getProfile();
-      set('profileId', p.id);
+      state.profileId = p.id;
     } catch {
-      set('profileId', '');
+      state.profileId = "";
     }
-    commit();
   },
 
   async save() {
-    const currentFile = get('currentFile');
-    await dispatch('saveFile', currentFile);
+    const currentFile = get((s) => s.currentFile);
+    await store.saveFile(currentFile);
   },
 
   async deleteFn() {
-    const fn = get('currentFunction');
+    const fn = get((s) => s.currentFunction);
 
-    if (fn && confirm(`Are you sure you want to remove "${fn.name}"? NO WAY BACK!`)) {
-      await getResourceStore().getResource('fn').remove(fn.id);
+    if (
+      fn &&
+      confirm(`Are you sure you want to remove "${fn.name}"? NO WAY BACK!`)
+    ) {
+      await getResourceStore().getResource("fn").remove(fn.id);
       await removeBin(fn.binId);
-      await dispatch('unselectFunction');
+      await store.unselectFunction();
     }
   },
 
-  updateCurrentFileContent(value) {
-    const currentFile = get('currentFile');
-    set('currentFile', {
+  updateCurrentFileContent(state, value) {
+    const currentFile = get((s) => s.currentFile);
+    state.currentFile = {
       meta: currentFile?.meta,
       contents: value,
-    });
-    commit();
+    };
   },
 
-  async updateFunctionList() {
-    const list: FunctionEntry[] = await getResourceStore().getResource('fn').list();
-    set('functionList', list.sort((a, b) => (a.name > b.name ? 1 : -1)));
-    commit();
+  async updateFunctionList(state) {
+    const list: FunctionEntry[] = await getResourceStore()
+      .getResource("fn")
+      .list();
+
+    state.functionList = list.sort((a, b) => (a.name > b.name ? 1 : -1));
   },
 
   async signin() {
@@ -201,36 +215,37 @@ export default {
     await signOut();
   },
 
-  selectFile(file) {
-    set('currentFile', file);
-    commit();
+  selectFile(state, file) {
+    state.currentFile = file;
   },
 
-  unselectFunction() {
-    set('binId', '');
-    set('currentFile', null);
-    set('currentFunction', null);
-    set('fileList', []);
+  unselectFunction(state) {
+    state.binId = "";
+    state.currentFile = null;
+    state.currentFunction = null;
+    state.fileList = [];
   },
 
-  async selectFunction(fn: FunctionEntry) {
-    set('binId', fn.binId);
-    set('currentFile', null);
-    set('currentFunction', fn);
+  async selectFunction(state, fn: FunctionEntry) {
+    state.binId = fn.binId;
+    state.currentFile = null;
+    state.currentFunction = fn;
 
-    await dispatch('updateFileList');
-    const indexFile = get('fileList').find((f) => f.meta?.name === 'index.mjs');
-    await dispatch('selectFile', indexFile);
+    await store.updateFileList();
+    const indexFile = get((s) => s.fileList).find(
+      (f) => f.meta?.name === "index.mjs"
+    );
+    await store.selectFile(indexFile);
   },
 
   async reload() {
-    await dispatch('updateFileList');
-    await dispatch('updateFunctionList');
+    await store.updateFileList();
+    await store.updateFunctionList();
   },
 
   async deploy() {
-    const binId = get('binId');
-    const fn = get('currentFunction');
+    const binId = get((s) => s.binId);
+    const fn = get((s) => s.currentFunction);
 
     if (!(binId && fn)) {
       return;
@@ -240,80 +255,72 @@ export default {
     const source = getZipUrl(binId);
     const body = JSON.stringify({ source, name });
     const headers = {
-      'content-type': 'application/json',
+      "content-type": "application/json",
     };
 
-    await fetch('https://cloud.jsfn.run', { method: 'POST', body, headers });
+    await fetch("https://cloud.jsfn.run", { method: "POST", body, headers });
   },
-  async startup() {
-    authEvents.addEventListener('signout', () => dispatch('resetAll'));
-    authEvents.addEventListener('signin', async () => dispatch('reloadAll'));
-    authEvents.addEventListener('state', async (profile) => {
-      const id = profile?.id || '';
-      set('profileId', id);
-      commit();
+  async startup(state) {
+    authEvents.addEventListener("signout", () => store.resetAll());
+    authEvents.addEventListener("signin", async () => store.reloadAll());
+    authEvents.addEventListener("state", async (profile) => {
+      const id = profile?.id || "";
+      state.profileId = id;
+
       if (id) {
-        dispatch('reloadAll');
+        store.reloadAll();
       } else {
-        dispatch('resetAll');
+        store.resetAll();
       }
     });
 
     try {
       await isAuthenticated();
-      dispatch('reloadAll');
+      store.reloadAll();
     } catch {}
   },
-  async resetAll() {
-    set('currentFile', null);
-    set('currentFunction', null);
-    set('fileList', []);
-    set('functionList', []);
-    set('profileId', '');
-    set('storeId', '');
-    commit();
+  async resetAll(state) {
+    Object.assign(state, {
+      currentFile: null,
+      currentFunction: null,
+      fileList: [],
+      functionList: [],
+      profileId: "",
+      storeId: "",
+    });
   },
   async reloadAll() {
-    await dispatch('updateProfileId');
-    await dispatch('setupStore');
-    await dispatch('reload');
+    await store.updateProfileId();
+    await store.setupStore();
+    await store.reload();
   },
   async selectActionFromUrl() {
-    const name = new URL(location.href).searchParams.get('fn');
+    const name = new URL(location.href).searchParams.get("fn");
 
     if (!name) {
       return;
     }
 
-    const fn = get('functionList').find((f) => f.name === name);
+    const fn = get((s) => s.functionList).find((f) => f.name === name);
     if (fn) {
-      await dispatch('selectFunction', fn);
+      await store.selectFunction(fn);
     }
   },
-  async setupStore() {
-    let storeId = await getProperty('jsfn:storeId');
+  async setupStore(state) {
+    let storeId = await getProperty("jsfn:storeId");
 
     if (!storeId) {
       storeId = await Store.create();
-      await setProperty('jsfn:storeId', storeId);
+      await setProperty("jsfn:storeId", storeId);
     }
 
-    set('storeId', storeId);
-    commit();
+    state.storeId = storeId;
   },
 
   autosave() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => dispatch('save'), 1000);
+    saveTimer = setTimeout(() => store.save(), 1000);
   },
-};
+});
 
-let saveTimer;
-
-const { set, get, react, watch, select, dispatch, commit } = useState(initialState, actions);
-
-function getResourceStore() {
-  return Store.get(get('storeId'));
-}
-
-export { get, react, watch, select, dispatch };
+export { get, select, store };

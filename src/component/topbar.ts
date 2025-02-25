@@ -1,9 +1,8 @@
-import './selector.js';
-import { customElement } from './decorators.js';
-import { html } from './component.js';
-import { dispatch, select } from '../store/store.js';
+import { createComponent } from "@li3/web";
+import "./selector.js";
+import { select, store } from "../store/store.js";
 
-const t = html`<div class="flex h-12 items-center px-3 border-b space-x-2">
+const template = `<div class="flex h-12 items-center px-3 border-b space-x-2">
   <js-selector placeholder="Select a lambda" class="w-full"></js-selector>
   <button
     ^click="signout"
@@ -23,11 +22,15 @@ const t = html`<div class="flex h-12 items-center px-3 border-b space-x-2">
   </button>
 </div>`;
 
-@customElement('js-topbar', t)
-export class Topbar extends HTMLElement {
-  isLoggedIn = select((s) => !!s.profileId);
+function setup() {
+  const isLoggedIn = select((s) => !!s.profileId);
 
-  onSignIn() {
-    this.isLoggedIn.value ? dispatch('signout') : dispatch('signin');
-  }
+  return {
+    isLoggedIn,
+    onSignIn() {
+      isLoggedIn.value ? store.dispatch.signout() : store.signin();
+    },
+  };
 }
+
+createComponent("js-topbar", { setup, template });
