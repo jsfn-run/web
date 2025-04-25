@@ -10,8 +10,8 @@ export class Editor extends HTMLElement {
     const editor = document.createElement("code-editor") as any;
     this.append(editor);
 
-    editor.addEventListener("change", () => {
-      dispatch("updateCurrentFileContent", editor.value);
+    editor.addEventListener("change", (event) => {
+      dispatch("updateCurrentFileContent", event.detail);
       dispatch("autosave");
     });
 
