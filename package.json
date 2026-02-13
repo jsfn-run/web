@@ -18,6 +18,6 @@
   "dependencies": {
     "@homebots/parse-html": "^1.1.1",
     "es-eventdelegate": "^1.0.0",
-    "markdown-it": "^14.0.0"
+    "markdown-it": "^14.1.1"
   }
 }
