@@ -1,6 +1,6 @@
 # jsfn.run function explorer
 
-A one-page, read-only reference for the public function source catalog. Search functions, select actions, inspect input/output declarations, query options and credential keys, and copy endpoint URLs or cURL request templates.
+A one-page, read-only reference for the public function source catalog. Search functions, scroll through every action's input/output declarations, query options and credential keys, and copy endpoint URLs, cURL requests or browser ES module examples. Each action has independent, keyboard-accessible `terminal-curl` and `browser` tabs. Browser snippets use `https://<name>.jsfn.run/index.mjs`; the explorer never imports or executes these modules itself.
 
 ## Development
 
@@ -22,7 +22,7 @@ The production output is `dist/`. The existing main-branch image build workflow 
 - Core returns action names, descriptions, input/output types, options (human-readable hints), credential names and default flags. It does **not** expose JSON Schema, required flags, examples, or option defaults. The UI never invents these. `raw` remains explicitly unspecified.
 - A small set of implementation notes and example bodies is source-derived and labeled separately from live metadata. These may need updating when implementations change.
 - Invocation templates use `POST /<action>` with the body directly, not an envelope. Credentials use base64-encoded UTF-8 JSON in an Authorization Bearer header. The explorer neither collects secrets nor executes functions; some functions modify data/devices or incur costs.
-- Preserve links with `?fn=base64&action=decode`. Browser back/forward is supported. Search also matches the editorial category labels; `/` focuses search.
+- Preserve links with `?fn=base64&action=decode`. Actions appear together; the action query scrolls to the matching section. Browser back/forward is supported. Search also matches the editorial category labels; `/` focuses search.
 - Metadata is escaped before rendering. Only known catalog names can trigger fetches. No generated API module or returned HTML is executed.
 
 ## Verification

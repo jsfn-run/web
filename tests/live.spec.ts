@@ -14,8 +14,13 @@ test('live documentation works without executing functions', async ({ page }) =>
   });
   await page.goto('/?fn=base64');
   await expect(page.getByText('Live documentation', { exact: true })).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: 'decode', exact: true }).click();
+  await page.getByRole('link', { name: 'decode', exact: false }).click();
   await expect(page.getByText('Decoded binary bytes.')).toBeVisible();
+  const exports = await page.evaluate(async () => {
+    const moduleUrl = 'https://base64.jsfn.run/index.mjs';
+    return Object.keys(await import(moduleUrl));
+  });
+  expect(exports).toEqual(expect.arrayContaining(['encode', 'decode', 'default']));
   await page.getByRole('searchbox').fill('hash');
   await page.locator('[data-function="hash"]').click();
   await expect(page.getByText('Live documentation', { exact: true })).toBeVisible({ timeout: 15000 });

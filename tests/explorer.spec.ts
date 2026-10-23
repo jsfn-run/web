@@ -19,10 +19,13 @@ test('catalog, actions, history, copy and responsive layout', async ({ page, con
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'base64', exact: true })).toBeVisible();
   await expect(page.locator('[data-function]')).toHaveCount(40);
-  await page.getByRole('button', { name: 'decode', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'encode', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'decode', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'decode', exact: false }).click();
   await expect(page).toHaveURL(/action=decode/);
   await expect(page.getByText('Optional decoding mode')).toBeVisible();
-  await page.getByRole('button', { name: 'Copy endpoint URL' }).click();
+  const decode = page.getByRole('region', { name: 'decode', exact: true });
+  await decode.getByRole('button', { name: 'Copy endpoint URL' }).click();
   await expect(page.getByText('Copied to clipboard')).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('https://base64.jsfn.run/decode');
   await page.getByRole('searchbox').fill('hash');
@@ -30,13 +33,42 @@ test('catalog, actions, history, copy and responsive layout', async ({ page, con
   await page.locator('[data-function="hash"]').click();
   await expect(page.getByRole('heading', { name: 'hash', exact: true })).toBeVisible();
   await page.goBack();
-  await expect(page.getByRole('button', { name: 'decode', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page).toHaveURL(/action=decode/);
+  await expect(page.getByRole('heading', { name: 'decode', exact: true })).toBeInViewport();
   await page.getByRole('searchbox').fill('no-such-function');
   await expect(page.getByText('No matches. Try a different search.')).toBeVisible();
   await page.getByRole('searchbox').fill('');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/explorer-${testInfo.project.name}.png`, fullPage: true });
   expect(errors).toEqual([]);
+});
+
+test('per-API code tabs support keyboard navigation and copy the active snippet', async ({
+  page,
+  context,
+}, testInfo) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route('https://*.jsfn.run/api', (route) => route.fulfill({ json: docs }));
+  await page.goto('/?fn=base64');
+  const encode = page.getByRole('region', { name: 'encode', exact: true });
+  const decode = page.getByRole('region', { name: 'decode', exact: true });
+  await encode.getByRole('tab', { name: 'browser', exact: true }).click();
+  await expect(encode.getByRole('tabpanel')).toContainText('import * as api from "https://base64.jsfn.run/index.mjs"');
+  await expect(encode.getByRole('tabpanel')).toContainText('const result = await response.text()');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await encode.screenshot({ path: `test-results/browser-example-${testInfo.project.name}.png` });
+  await expect(decode.getByRole('tab', { name: 'terminal-curl' })).toHaveAttribute('aria-selected', 'true');
+  await encode.getByRole('button', { name: 'Copy request' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('api["encode"](input, options)');
+  await encode.getByRole('tab', { name: 'browser', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(encode.getByRole('tab', { name: 'terminal-curl' })).toBeFocused();
+  await expect(encode.getByRole('tabpanel')).toContainText('curl --request POST');
+  await encode.getByRole('button', { name: 'Copy request' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('curl --request POST');
+  await expect(page.getByText('Source catalog · live documentation')).toHaveCount(0);
+  await expect(page.getByText('Listed from source. Availability is checked when you open a function.')).toHaveCount(0);
+  await expect(page.getByText('jsfn.run / Function reference')).toHaveCount(0);
 });
 
 test('loading, failure, retry, unsafe metadata and empty actions', async ({ page }) => {

@@ -196,27 +196,97 @@ function typeDescription(type: string, output: boolean) {
   return `${output ? 'Returns' : 'Accepts'} ${type === 'buffer' ? 'binary bytes' : type === 'json' ? 'a JSON value' : type === 'text' ? 'text' : type}. Field-level schemas are not exposed by this API.`;
 }
 
-function renderDocumentation(docs: Documentation, actionName = new URL(location.href).searchParams.get('action')) {
+function renderDocumentation(docs: Documentation) {
   if (!docs.actions.length) {
     state('No actions documented', 'This endpoint returned an empty action list.');
     return;
   }
-  const action =
-    docs.actions.find((a) => a.name === actionName) ?? docs.actions.find((a) => a.default) ?? docs.actions[0];
   const name = selected;
+  detail.innerHTML = `<div class="breadcrumb"><span>Functions</span><span>/</span><span>${escape(name)}</span></div>
+    <div class="detail-heading"><span class="heading-symbol" aria-hidden="true">ƒ</span><h2>${escape(name)}</h2><span class="badge">Live documentation</span></div>
+    <p class="description">${escape(docs.description || catalog[name])}</p>
+    <nav class="action-index" aria-label="Jump to API"><span>On this page</span>${docs.actions.map((a, i) => `<a href="?fn=${name}&amp;action=${encodeURIComponent(a.name)}#api-${i}" data-jump="${i}"><span aria-hidden="true">ƒ</span> ${escape(a.name)} <span aria-hidden="true">↓</span></a>`).join('')}</nav>
+    ${docs.actions.map((action, index) => renderAction(name, action, index)).join('')}
+    <div class="detail-footer"><p>Metadata via OPTIONS /api · <button class="button" id="refresh">Refresh</button></p><a class="doc-link" href="https://github.com/jsfn-run/functions/tree/main/functions/${name}" target="_blank" rel="noreferrer">Read implementation ↗</a></div>`;
+  detail.querySelectorAll<HTMLAnchorElement>('[data-jump]').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      event.preventDefault();
+      history.pushState(null, '', link.href);
+      el(`api-${link.dataset.jump}`).focus({ preventScroll: true });
+      el(`api-${link.dataset.jump}`).scrollIntoView({ block: 'start' });
+    });
+  });
+  docs.actions.forEach((action, index) => {
+    const section = el(`api-${index}`);
+    const snippets = requestSnippets(name, action);
+    let format: 'terminal-curl' | 'browser' = 'terminal-curl';
+    const tabs = Array.from(section.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const activate = (tab: HTMLButtonElement) => {
+      format = tab.dataset.format as typeof format;
+      tabs.forEach((item) => {
+        item.setAttribute('aria-selected', String(item === tab));
+        item.tabIndex = item === tab ? 0 : -1;
+        el(item.getAttribute('aria-controls')!).hidden = item !== tab;
+      });
+    };
+    tabs.forEach((tab, position) => {
+      tab.addEventListener('click', () => activate(tab));
+      tab.addEventListener('keydown', (event) => {
+        const next =
+          event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? tabs.length - 1
+              : event.key === 'ArrowRight'
+                ? (position + 1) % tabs.length
+                : event.key === 'ArrowLeft'
+                  ? (position + tabs.length - 1) % tabs.length
+                  : -1;
+        if (next < 0) {
+          return;
+        }
+        event.preventDefault();
+        activate(tabs[next]);
+        tabs[next].focus();
+      });
+    });
+    section.querySelector('[data-copy-url]')!.addEventListener('click', () => void copy(snippets.endpoint));
+    section.querySelector('[data-copy-code]')!.addEventListener('click', () => void copy(snippets[format]));
+  });
+  el('refresh').addEventListener('click', () => void selectFunction(name, true));
+  const actionName = new URL(location.href).searchParams.get('action');
+  const target = docs.actions.findIndex((action) => action.name === actionName);
+  if (target >= 0) {
+    el(`api-${target}`).scrollIntoView({ block: 'start' });
+  }
+}
+
+function requestSnippets(name: string, action: Action) {
   const endpoint = `https://${name}.jsfn.run/${encodeURIComponent(action.name)}`;
   const note = sourceNotes[`${name}/${action.name}`];
   const body = note?.body ?? (action.input === 'json' ? '{}' : '<your input>');
   const snippet = `curl --request POST ${shellQuote(endpoint)}${action.credentials.length ? ' \\\n  --header "Authorization: Bearer $JSFN_CREDENTIALS"' : ''}${action.input === 'json' ? " \\\n  --header 'Content-Type: application/json'" : ''}${action.input === 'undefined' ? '' : ` \\\n  --data-binary ${shellQuote(body)}`}`;
-  detail.innerHTML = `<div class="breadcrumb"><span>Functions</span><span>/</span><span>${escape(name)}</span></div>
-    <div class="detail-heading"><h2>${escape(name)}</h2><span class="badge">Live documentation</span></div>
-    <p class="description">${escape(docs.description || catalog[name])}</p>
-    <div class="action-tabs" role="group" aria-label="Actions">${docs.actions.map((a) => `<button data-action="${escape(a.name)}" aria-pressed="${a.name === action.name}">${escape(a.name)}${a.default ? ' · default' : ''}</button>`).join('')}</div>
+  const input = action.input === 'undefined' ? 'undefined' : action.input === 'json' ? body : JSON.stringify(body);
+  const credentials = Object.fromEntries(action.credentials.map((key) => [key, '<your credential>']));
+  const raw = !['json', 'text', 'buffer', 'dom'].includes(action.output);
+  const result = raw ? 'response' : 'result';
+  const browser = `import * as api from "https://${name}.jsfn.run/index.mjs";\n\nconst input = ${input};\nconst options = {}; // Query options${action.credentials.length ? `\nconst credentials = ${JSON.stringify(credentials, null, 2)};` : ''}\n\nconst ${result} = await api[${JSON.stringify(action.name)}](input, options${action.credentials.length ? ', credentials' : ''});${raw ? '\nif (!response.ok) {\n  throw new Error(`Request failed: ${response.status}`);\n}' : ''}\n${raw ? (name === 'base64' ? `const result = await response.${action.name === 'decode' ? 'arrayBuffer' : 'text'}();\nconsole.log(result);` : '// Raw output returns a Response. Choose text(), json(), or arrayBuffer().\nconsole.log(response);') : 'console.log(result);'}`;
+  return { endpoint, 'terminal-curl': snippet, browser };
+}
+
+function renderAction(name: string, action: Action, index: number) {
+  const note = sourceNotes[`${name}/${action.name}`];
+  const snippets = requestSnippets(name, action);
+  return `<section class="api-section" id="api-${index}" tabindex="-1" aria-labelledby="api-heading-${index}">
+    <div class="api-heading"><span class="heading-symbol" aria-hidden="true">ƒ</span><h3 id="api-heading-${index}">${escape(action.name)}</h3>${action.default ? '<span class="badge">Default</span>' : ''}</div>
     ${action.description ? `<p class="description">${escape(action.description)}</p>` : ''}
-    <div class="endpoint"><span class="method">POST</span><code>${escape(endpoint)}</code><button class="copy-button" id="copy-url" aria-label="Copy endpoint URL">Copy URL</button></div>
-    <div class="section-heading"><h3>Input</h3><span>Request body</span></div>
+    <div class="endpoint"><span class="method">POST</span><code>${escape(snippets.endpoint)}</code><button class="copy-button" data-copy-url aria-label="Copy endpoint URL">Copy URL</button></div>
+    <div class="section-heading"><h4>Input</h4><span>Request body</span></div>
     <div class="schema">${row('body', action.input, typeDescription(action.input, false))}${note ? row('Implementation note', 'Source-derived', note.input) : ''}</div>
-    <div class="section-heading"><h3>Options</h3><span>Query parameters</span></div>
+    <div class="section-heading"><h4>Options</h4><span>Query parameters</span></div>
     ${
       Object.keys(action.options).length
         ? `<div class="schema">${Object.entries(action.options)
@@ -224,27 +294,15 @@ function renderDocumentation(docs: Documentation, actionName = new URL(location.
             .join('')}</div><p class="quiet">Required flags and defaults are not provided by this endpoint.</p>`
         : '<p class="quiet">No query options are documented for this action.</p>'
     }
-    <div class="section-heading"><h3>Output</h3><span>Response body</span></div>
+    <div class="section-heading"><h4>Output</h4><span>Response body</span></div>
     <div class="schema">${row('result', action.output, typeDescription(action.output, true))}${note ? row('Implementation note', 'Source-derived', note.output) : ''}</div>
-    ${action.credentials.length ? `<div class="section-heading"><h3>Credentials</h3><span>Authorization header</span></div><div class="schema">${action.credentials.map((c) => row(c, 'Credential key', 'Declared by this action. Supply through the Authorization header, not the URL.')).join('')}</div><p class="quiet">JSFN_CREDENTIALS is base64-encoded UTF-8 JSON containing these keys. Base64 is not encryption. Use HTTPS and keep secrets out of shared snippets.</p>` : ''}
-    <div class="section-heading"><h3>Make a request</h3><span>${note ? 'Source-derived example' : 'Request template'}</span></div>
-    <div class="code-panel"><div class="code-bar"><span>Terminal · cURL</span><button class="copy-button" id="copy-code">Copy request</button></div><pre><code>${escape(snippet)}</code></pre></div>
+    ${action.credentials.length ? `<div class="section-heading"><h4>Credentials</h4><span>Authorization header</span></div><div class="schema">${action.credentials.map((c) => row(c, 'Credential key', 'Declared by this action. Supply through the Authorization header, not the URL.')).join('')}</div><p class="quiet">JSFN_CREDENTIALS is base64-encoded UTF-8 JSON containing these keys. Base64 is not encryption. Use HTTPS and keep secrets out of shared snippets.</p>` : ''}
+    <div class="section-heading"><h4>Make a request</h4><span>${note ? 'Source-derived example' : 'Request template'}</span></div>
+    <div class="code-panel"><div class="code-bar"><div class="code-tabs" role="tablist" aria-label="${escape(action.name)} request format">${['terminal-curl', 'browser'].map((format, i) => `<button role="tab" id="tab-${index}-${i}" data-format="${format}" aria-selected="${i === 0}" aria-controls="panel-${index}-${i}" tabindex="${i === 0 ? 0 : -1}">${format}</button>`).join('')}</div><button class="copy-button" data-copy-code>Copy request</button></div>
+    <div role="tabpanel" id="panel-${index}-0" aria-labelledby="tab-${index}-0" tabindex="0"><pre><code>${escape(snippets['terminal-curl'])}</code></pre></div>
+    <div role="tabpanel" id="panel-${index}-1" aria-labelledby="tab-${index}-1" tabindex="0" hidden><pre><code>${escape(snippets.browser)}</code></pre><p class="browser-note">Use in a browser ES module (script type="module"). ${action.output === 'dom' ? 'This client inserts returned HTML, scripts and styles into the page. Only use trusted functions.' : 'The client parses declared output types; raw output returns a Response.'}${action.credentials.length ? ' Never hard-code private credentials in a public page.' : ''}</p></div></div>
     <p class="quiet">${note ? 'Example input, not a verified response.' : 'Replace placeholder input and add documented query options as needed.'} Requests are not executed by this explorer.</p>
-    <div class="detail-footer"><p>Metadata via OPTIONS /api · <button class="button" id="refresh">Refresh</button></p><a class="doc-link" href="https://github.com/jsfn-run/functions/tree/main/functions/${name}" target="_blank" rel="noreferrer">Read implementation ↗</a></div>`;
-  detail.querySelectorAll<HTMLButtonElement>('[data-action]').forEach((button) =>
-    button.addEventListener('click', () => {
-      const url = new URL(location.href);
-      url.searchParams.set('action', button.dataset.action!);
-      history.pushState(null, '', url);
-      renderDocumentation(docs, button.dataset.action);
-      Array.from(detail.querySelectorAll<HTMLButtonElement>('[data-action]'))
-        .find((b) => b.dataset.action === button.dataset.action)
-        ?.focus();
-    }),
-  );
-  el('copy-url').addEventListener('click', () => void copy(endpoint));
-  el('copy-code').addEventListener('click', () => void copy(snippet));
-  el('refresh').addEventListener('click', () => void selectFunction(name, true));
+    </section>`;
 }
 
 async function copy(text: string) {
