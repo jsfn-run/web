@@ -1,77 +1,61 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-    <title>jsfn.run - An utility belt for the web AND your terminal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="A  utility belt for the web . jsfn let's you run Javascript functions as an API, and you can call it from a CLI, a web page or any other thing that talks HTTPS."
+      content="Discover JavaScript functions. Explore their inputs, outputs, and HTTP APIs in one place."
     />
-    <script type="importmap">
-      {
-        "imports": {
-          "@li3/": "https://--li3.static.apphor.de/",
-          "@sodium/": "https://--sodium.static.apphor.de/",
-          "@lucide/": "https://--lucide.static.apphor.de/",
-          "@jsfn/": "https://--jsfn.static.apphor.de/"
-        }
-      }
-    </script>
-    <link
-      href="https://fonts.googleapis.com/icon?family=Material+Icons"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/@tailwindcss/typography@0.5.0/dist/typography.min.css"
-    />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/codemirror@5.59.4/lib/codemirror.css"
-    />
-    <link rel="shortcut icon" type="image/png" href="/assets/favicon.ico" />
+    <title>Function explorer · jsfn.run</title>
+    <link rel="icon" href="/favicon.ico" />
   </head>
   <body>
-    <js-app></js-app>
-    <script type="module" src="./main.ts"></script>
+    <a class="skip-link" href="#detail">Skip to documentation</a>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">ƒ</span>jsfn<span class="brand-suffix">.run</span></a>
+      <span class="topbar-label">Function explorer</span>
+      <a class="source-link" href="https://github.com/jsfn-run/functions" target="_blank" rel="noreferrer"
+        >View source ↗</a
+      >
+    </header>
+    <main class="workspace">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">SMALL FUNCTIONS. ENDLESS POSSIBILITIES.</p>
+          <h1 id="page-title">Your next building block.</h1>
+          <p class="intro-copy">Find a function. Understand its inputs. Know what comes back.</p>
+        </div>
+        <div class="catalog-status">
+          <span class="status-dot"></span><span>Source catalog · live documentation</span>
+        </div>
+      </section>
+      <div class="explorer">
+        <aside class="sidebar" aria-label="Function catalog">
+          <div class="sidebar-heading">
+            <h2>Functions <span id="count" class="count">40</span></h2>
+          </div>
+          <label class="search"
+            ><span aria-hidden="true">⌕</span
+            ><input id="search" type="search" placeholder="Search functions…" aria-label="Search functions" /><kbd
+              >/</kbd
+            ></label
+          >
+          <p id="list-status" class="list-status" role="status"></p>
+          <nav id="function-list" aria-label="Available functions"></nav>
+          <div class="sidebar-note">
+            <span class="note-symbol">{ }</span>
+            <div>
+              <strong>One API. Many possibilities.</strong>
+              <p>Listed from source. Availability is checked when you open a function.</p>
+            </div>
+          </div>
+        </aside>
+        <article id="detail" class="detail" tabindex="-1" aria-label="Function documentation"></article>
+      </div>
+      <footer><span>Built for the web. And your terminal.</span><span>jsfn.run / Function reference</span></footer>
+    </main>
+    <div id="notification" class="notification" role="status"></div>
+    <script type="module" src="/main.ts"></script>
   </body>
 </html>
-
-<style type="text/css">
-  .CodeMirror {
-    height: 100%;
-  }
-  .icon {
-    width: 1rem;
-    height: 1rem;
-    background-size: 1rem 1rem;
-    background-repeat: no-repeat;
-    background-position: center center;
-  }
-
-  .icon-file {
-    background-image: url(/file.svg);
-  }
-
-  .file-link {
-    width: calc(100% - 1.5rem);
-  }
-
-  .flex > * {
-    min-width: 0;
-  }
-
-  /* main {
-    max-width: calc(100% - 16rem);
-  } */
-
-  #editor {
-    height: calc(100% - 4rem);
-  }
-</style>
